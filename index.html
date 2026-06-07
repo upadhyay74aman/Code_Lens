@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeLens — AI Codebase Intelligence Engine</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Highlight.js for Code Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  
+  <!-- Marked.js for Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <style>
+    :root {
+      --bg-main: #0d1117;
+      --bg-sidebar: #161b22;
+      --bg-card: #1c2128;
+      --border-color: #30363d;
+      --accent-color: #58a6ff;
+      --accent-hover: #79c0ff;
+      --accent-glow: rgba(88, 166, 255, 0.12);
+      
+      --green: #3fb950;
+      --green-glow: rgba(63, 185, 80, 0.15);
+      --orange: #d29922;
+      --orange-glow: rgba(210, 153, 34, 0.15);
+      --red: #f85149;
+      --red-glow: rgba(248, 81, 73, 0.15);
+      
+      --text-primary: #e6edf3;
+      --text-muted: #7d8590;
+      
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+      
+      --header-height: 60px;
+      --sidebar-width: 260px;
+      --right-panel-width: 300px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: var(--font-ui);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-main);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* HEADER */
+    header {
+      height: var(--header-height);
+      background-color: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 10;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-code);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent-color);
+      user-select: none;
+    }
+    .logo-icon {
+      font-size: 1.4rem;
+    }
+
+    .repo-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px 8px;
+      width: 45%;
+      max-width: 600px;
+      min-width: 320px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .repo-bar:focus-within {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .repo-bar input {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .repo-bar input.repo-url {
+      flex: 1;
+    }
+    .repo-bar input.repo-branch {
+      width: 80px;
+      border-left: 1px solid var(--border-color);
+      padding-left: 8px;
+      font-family: var(--font-code);
+    }
+    
+    .validation-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+    }
+    .validation-success { color: var(--green); }
+    .validation-error { color: var(--red); }
+
+    .btn-index {
+      background-color: var(--accent-color);
+      color: #0d1117;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+    .btn-index:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+    .btn-index:disabled {
+      background-color: var(--border-color);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+    .status-pill.ready .status-dot {
+      background-color: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .status-pill.loading .status-dot {
+      background-color: var(--orange);
+      animation: pulse 1.5s infinite;
+    }
+
+    /* MAIN CONTAINER */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* PANELS GENERAL */
+    .panel {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-main);
+      overflow: hidden;
+      border-right: 1px solid var(--border-color);
+    }
+
+    /* LEFT PANEL: FILE TREE */
+    .left-panel {
+      width: var(--sidebar-width);
+      min-width: 200px;
+      max-width: 350px;
+      background-color: var(--bg-sidebar);
+      flex-shrink: 0;
+    }
+    
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tree-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    .tree-search-bar input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      flex: 1;
+    }
+
+    .tree-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 8px;
+    }
+
+    /* Recursive Tree Styles */
+    .tree-list {
+      list-style: none;
+      padding-left: 14px;
+    }
+    .tree-list:first-child {
+      padding-left: 0;
+    }
+    .tree-item {
+      margin: 2px 0;
+      user-select: none;
+    }
+    .tree-node-content {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      transition: background-color 0.15s;
+    }
+    .tree-node-content:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    .tree-node-content.active {
+      background-color: var(--accent-glow);
+      color: var(--accent-color);
+      font-weight: 500;
+    }
+    .tree-node-content.flash-highlight {
+      animation: flash 1.5s ease;
+    }
+
+    .tree-arrow {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      width: 10px;
+      display: inline-block;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .tree-arrow.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .tree-icon {
+      font-size: 0.9rem;
+      display: inline-block;
+      width: 16px;
+      text-align: center;
+    }
+
+    .left-panel-footer {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border-color);
+      background-color: var(--bg-sidebar);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* CENTER PANEL: CHAT WINDOW */
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .repo-summary-banner {
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+    .repo-summary-title {
+      font-weight: 600;
+      color: var(--accent-color);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .repo-summary-banner.hidden {
+      display: none;
+    }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Welcome Box */
+    .welcome-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      text-align: center;
+      padding: 40px;
+    }
+    .welcome-logo {
+      font-size: 3.5rem;
+      color: var(--accent-color);
+      margin-bottom: 12px;
+      animation: float 4s ease-in-out infinite;
+    }
+    .welcome-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .welcome-tagline {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      max-width: 400px;
+    }
+    .welcome-suggestions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 450px;
+    }
+    .suggestion-chip {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      cursor: pointer;
+      text-align: left;
+      transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .suggestion-chip:hover {
+      background-color: rgba(255, 255, 255, 0.02);
+      border-color: var(--accent-color);
+      transform: translateY(-1px);
+    }
+    .suggestion-arrow {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    /* Message Bubbles */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 85%;
+      animation: fadeIn 0.25s ease-out;
+    }
+    .message.user {
+      align-self: flex-end;
+    }
+    .message.assistant {
+      align-self: flex-start;
+      width: 100%;
+      max-width: 90%;
+    }
+    .message-header {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .message.user .message-header {
+      justify-content: flex-end;
+    }
+    .message-body {
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .message.user .message-body {
+      background-color: var(--accent-color);
+      color: #0d1117;
+      font-weight: 500;
+      border-bottom-right-radius: 2px;
+    }
+    .message.assistant .message-body {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-bottom-left-radius: 2px;
+    }
+
+    /* Markdown Renders in Chat */
+    .message-body h1, .message-body h2, .message-body h3 {
+      font-weight: 600;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      color: var(--accent-color);
+    }
+    .message-body h1:first-child, .message-body h2:first-child, .message-body h3:first-child {
+      margin-top: 0;
+    }
+    .message-body h1 { font-size: 1.15rem; }
+    .message-body h2 { font-size: 1.05rem; }
+    .message-body h3 { font-size: 0.95rem; }
+    
+    .message-body p {
+      margin-bottom: 10px;
+    }
+    .message-body p:last-child {
+      margin-bottom: 0;
+    }
+    .message-body ul, .message-body ol {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+    .message-body li {
+      margin-bottom: 4px;
+    }
+
+    .message-body pre {
+      position: relative;
+      margin: 12px 0;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .message-body pre code {
+      display: block;
+      padding: 12px;
+      overflow-x: auto;
+      font-family: var(--font-code);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      background: transparent;
+    }
+    .message-body code {
+      font-family: var(--font-code);
+      font-size: 0.8rem;
+      padding: 2px 4px;
+      background-color: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+    }
+
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      background-color: var(--orange-glow);
+      color: var(--orange);
+      border: 1px solid rgba(210, 153, 34, 0.3);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: var(--font-code);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin: 0 2px;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .file-badge:hover {
+      background-color: rgba(210, 153, 34, 0.25);
+      border-color: var(--orange);
+    }
+
+    /* Copy Button in Code Blocks */
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font-ui);
+      font-weight: 500;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .copy-btn:hover {
+      background-color: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    /* Loading / Pulse Cursor */
+    .pulse-cursor {
+      display: inline-block;
+      width: 6px;
+      height: 14px;
+      background-color: var(--accent-color);
+      margin-left: 4px;
+      animation: pulse 1s infinite;
+      vertical-align: middle;
+    }
+
+    /* Chat Input Area */
+    .chat-input-wrapper {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-color);
+      background-color: var(--bg-sidebar);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .textarea-container {
+      flex: 1;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      position: relative;
+    }
+    .textarea-container:focus-within {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .textarea-container textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      resize: none;
+      max-height: 160px;
+      min-height: 20px;
+      line-height: 1.4;
+    }
+
+    .char-counter {
+      position: absolute;
+      right: 10px;
+      bottom: 6px;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+
+    .btn-send {
+      background-color: var(--accent-color);
+      color: #0d1117;
+      border: none;
+      border-radius: 6px;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .btn-send:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+    .btn-send:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+    .btn-send:disabled {
+      background-color: var(--border-color);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .chat-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    
+    .conversation-mode-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      background-color: var(--border-color);
+      border-radius: 9px;
+      transition: background-color 0.2s;
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: var(--bg-main);
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+    .conversation-mode-container.active .toggle-switch {
+      background-color: var(--green);
+    }
+    .conversation-mode-container.active .toggle-switch::after {
+      transform: translateX(14px);
+    }
+
+    /* RIGHT PANEL: CONTEXT SOURCES */
+    .right-panel {
+      width: var(--right-panel-width);
+      flex-shrink: 0;
+      background-color: var(--bg-sidebar);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sources-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .source-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.15s;
+    }
+    .source-card:hover {
+      border-color: var(--text-muted);
+    }
+
+    .source-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+    }
+    .source-filename {
+      font-family: var(--font-code);
+      font-weight: 600;
+      color: var(--accent-color);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+    .source-badge {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--text-muted);
+    }
+
+    .source-preview {
+      font-family: var(--font-code);
+      font-size: 0.7rem;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 8px;
+      border-radius: 4px;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .source-preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 20px;
+      background: linear-gradient(transparent, var(--bg-main));
+    }
+
+    .source-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .btn-view-context {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+    }
+    .btn-view-context:hover {
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+      background-color: var(--accent-glow);
+    }
+
+    /* Confidence Similarity Bar */
+    .confidence-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+      max-width: 100px;
+    }
+    .confidence-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    .confidence-bar {
+      height: 4px;
+      background-color: var(--border-color);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    .confidence-fill.high { background-color: var(--green); }
+    .confidence-fill.med { background-color: var(--orange); }
+    .confidence-fill.low { background-color: var(--red); }
+
+    .sources-stat-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* OVERLAYS & LOADING MECHANISMS */
+    /* Full screen indexing progress overlay */
+    .indexing-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .indexing-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .indexing-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 30px;
+      width: 90%;
+      max-width: 440px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    
+    .indexing-card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .indexing-card-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .progress-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+    .step-item.active {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .step-item.completed {
+      color: var(--green);
+    }
+
+    .step-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+    }
+    .step-item.active .step-indicator {
+      border-color: var(--accent-color);
+      animation: borderPulse 1.5s infinite;
+      position: relative;
+    }
+    .step-item.active .step-indicator::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background-color: var(--accent-color);
+      border-radius: 50%;
+    }
+    .step-item.completed .step-indicator {
+      border-color: var(--green);
+      background-color: var(--green-glow);
+    }
+    
+    /* Shimmer Effect for Loading Tree */
+    .shimmer-line {
+      height: 12px;
+      background: linear-gradient(90deg, #161b22 25%, #21262d 50%, #161b22 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      margin: 8px 0;
+    }
+    .shimmer-line.w-70 { width: 70%; }
+    .shimmer-line.w-50 { width: 50%; }
+    .shimmer-line.w-80 { width: 80%; }
+    .shimmer-container {
+      padding: 10px 16px;
+    }
+
+    /* Skeleton message loading */
+    .skeleton-message {
+      align-self: flex-start;
+      width: 75%;
+      margin: 10px 0;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .skeleton-message .bubble {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      border-bottom-left-radius: 2px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .skeleton-bar {
+      height: 10px;
+      background: linear-gradient(90deg, #1c2128 25%, #30363d 50%, #1c2128 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    /* Empty state messages */
+    .empty-state-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 40px;
+      padding: 0 20px;
+    }
+
+    /* SVGS FOR ICONS (INLINE REPLACEMENTS) */
+    .svg-icon {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    /* ANIMATIONS */
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+    @keyframes borderPulse {
+      0% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(88, 166, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0); }
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+      100% { transform: translateY(0px); }
+    }
+    @keyframes flash {
+      0% { background-color: rgba(210, 153, 34, 0.4); }
+      100% { background-color: transparent; }
+    }
+
+    /* RESPONSIVE LAYOUT */
+    @media (max-width: 900px) {
+      .right-panel {
+        display: none !important; /* Hide context panel */
+      }
+      .left-panel.collapsed-sidebar {
+        display: none !important;
+      }
+      .repo-bar {
+        width: 350px;
+        min-width: 250px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-container">
+      <span class="logo-icon">⬡</span>
+      <span>CodeLens</span>
+    </div>
+    
+    <div class="repo-bar">
+      <!-- Repo Icon SVG -->
+      <svg class="svg-icon" style="color: var(--text-muted); margin-right: 4px;" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+      <input type="text" id="repoUrlInput" class="repo-url" placeholder="https://github.com/username/repository" autocomplete="off">
+      
+      <!-- Validation Mark -->
+      <div id="validationIndicator" class="validation-indicator"></div>
+      
+      <input type="text" id="repoBranchInput" class="repo-branch" placeholder="main" value="main">
+      <button id="btnIndex" class="btn-index" disabled>
+        <!-- Stack Icon SVG -->
+        <svg class="svg-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+        Index
+      </button>
+    </div>
+
+    <div class="status-container">
+      <div id="statusPill" class="status-pill">
+        <div class="status-dot"></div>
+        <span id="statusText">No repo indexed</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="main-workspace">
+
+    <!-- LEFT PANEL: FILE TREE -->
+    <div id="leftPanel" class="panel left-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>Files</span>
+          <!-- Folder Icon SVG -->
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <div class="tree-search-bar">
+          <!-- Search Icon SVG -->
+          <svg class="svg-icon" style="color: var(--text-muted);" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="treeSearchInput" placeholder="Filter files...">
+        </div>
+      </div>
+      
+      <div id="treeContainer" class="tree-container">
+        <!-- Tree content or shimmer placeholder -->
+        <div class="shimmer-container" id="treeShimmer" style="display: none;">
+          <div class="shimmer-line w-80"></div>
+          <div class="shimmer-line w-50" style="margin-left: 14px;"></div>
+          <div class="shimmer-line w-70" style="margin-left: 14px;"></div>
+          <div class="shimmer-line w-80"></div>
+          <div class="shimmer-line w-50" style="margin-left: 14px;"></div>
+        </div>
+        <div class="empty-state-text" id="treeEmptyState">
+          Enter a repository URL above to index and view files.
+        </div>
+      </div>
+
+      <div class="left-panel-footer">
+        <span id="fileCountText">0 files</span>
+        <span>Ctrl+K to focus</span>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL: CHAT / Q&A -->
+    <div class="panel center-panel">
+      
+      <!-- Repository Summary Banner (Hidden by default) -->
+      <div id="repoSummaryBanner" class="repo-summary-banner hidden">
+        <div class="repo-summary-title">
+          <!-- Info Icon SVG -->
+          <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          Codebase Summary
+        </div>
+        <div id="repoSummaryText">Repository summary loading...</div>
+      </div>
+
+      <!-- Chat Container -->
+      <div id="chatContainer" class="chat-container">
+        
+        <!-- Welcome screen before indexing -->
+        <div id="welcomeScreen" class="welcome-screen">
+          <div class="welcome-logo">⬡</div>
+          <h2 class="welcome-title">Welcome to CodeLens</h2>
+          <p class="welcome-tagline">Semantic vector search and AI agent that deeply understands your codebase. Index a repository to begin.</p>
+          
+          <div class="welcome-suggestions">
+            <div class="suggestion-chip" data-question="How does authentication work?">
+              <span>How does authentication work?</span>
+              <span class="suggestion-arrow">→</span>
+            </div>
+            <div class="suggestion-chip" data-question="Explain the database schema and model definitions">
+              <span>Explain the database schema</span>
+              <span class="suggestion-arrow">→</span>
+            </div>
+            <div class="suggestion-chip" data-question="Find all API endpoints and describe what they do">
+              <span>Find all API endpoints</span>
+              <span class="suggestion-arrow">→</span>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="chat-input-wrapper">
+        <div class="chat-input-row">
+          <div class="textarea-container">
+            <textarea id="chatInput" placeholder="Ask a question about this repository..." rows="1" disabled></textarea>
+            <div id="charCounter" class="char-counter">0</div>
+          </div>
+          <button id="btnSendChat" class="btn-send" disabled>
+            <!-- Send Icon SVG -->
+            <svg class="svg-icon" style="stroke: #0d1117;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+        <div class="chat-meta-row">
+          <span>Enter to send, Shift+Enter for new line · Ctrl+L to clear</span>
+          <div id="conversationModeToggle" class="conversation-mode-container">
+            <div class="toggle-switch"></div>
+            <span>Conversation Mode</span>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- RIGHT PANEL: CONTEXT SOURCES -->
+    <div id="rightPanel" class="panel right-panel">
+      <div class="sources-stat-header">
+        <span>Context Sources</span>
+        <span id="chunksAnalyzedText">Analyzed: 0 chunks</span>
+      </div>
+      
+      <div id="sourcesContainer" class="sources-list">
+        <!-- Sources empty state -->
+        <div class="empty-state-text" id="sourcesEmptyState">
+          Source chunks will be displayed here after you ask a question.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INDEXING PROGRESS OVERLAY -->
+  <div id="indexingOverlay" class="indexing-overlay">
+    <div class="indexing-card">
+      <div class="indexing-card-title">
+        <span>⬡ Indexing Repository</span>
+      </div>
+      <div class="indexing-card-subtitle" id="indexingSubtitle">
+        Connecting to GitHub and analyzing repository structure...
+      </div>
+      
+      <div class="progress-steps">
+        <div class="step-item" id="stepClone">
+          <div class="step-indicator"></div>
+          <span>Cloning repository...</span>
+        </div>
+        <div class="step-item" id="stepRead">
+          <div class="step-indicator"></div>
+          <span>Reading codebase files...</span>
+        </div>
+        <div class="step-item" id="stepEmbed">
+          <div class="step-indicator"></div>
+          <span>Creating AI embeddings...</span>
+        </div>
+        <div class="step-item" id="stepIndex">
+          <div class="step-indicator"></div>
+          <span>Building vector search index...</span>
+        </div>
+        <div class="step-item" id="stepSummary">
+          <div class="step-indicator"></div>
+          <span>Generating codebase summary...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const API_BASE = "http://localhost:8000";
+    
+    // Application State
+    const state = {
+      isIndexed: false,
+      repoName: "",
+      filesCount: 0,
+      chunksCount: 0,
+      fileTreeData: null,
+      conversationMode: false,
+      chatHistory: [], // stores { role, content }
+      focusedFiles: new Set(),
+    };
+
+    // DOM Elements
+    const repoUrlInput = document.getElementById("repoUrlInput");
+    const repoBranchInput = document.getElementById("repoBranchInput");
+    const btnIndex = document.getElementById("btnIndex");
+    const validationIndicator = document.getElementById("validationIndicator");
+    const statusPill = document.getElementById("statusPill");
+    const statusText = document.getElementById("statusText");
+    
+    const treeContainer = document.getElementById("treeContainer");
+    const treeShimmer = document.getElementById("treeShimmer");
+    const treeEmptyState = document.getElementById("treeEmptyState");
+    const fileCountText = document.getElementById("fileCountText");
+    const treeSearchInput = document.getElementById("treeSearchInput");
+    
+    const repoSummaryBanner = document.getElementById("repoSummaryBanner");
+    const repoSummaryText = document.getElementById("repoSummaryText");
+    
+    const chatContainer = document.getElementById("chatContainer");
+    const welcomeScreen = document.getElementById("welcomeScreen");
+    const chatInput = document.getElementById("chatInput");
+    const btnSendChat = document.getElementById("btnSendChat");
+    const charCounter = document.getElementById("charCounter");
+    const conversationModeToggle = document.getElementById("conversationModeToggle");
+    
+    const rightPanel = document.getElementById("rightPanel");
+    const sourcesContainer = document.getElementById("sourcesContainer");
+    const sourcesEmptyState = document.getElementById("sourcesEmptyState");
+    const chunksAnalyzedText = document.getElementById("chunksAnalyzedText");
+    
+    const indexingOverlay = document.getElementById("indexingOverlay");
+    const indexingSubtitle = document.getElementById("indexingSubtitle");
+    
+    // Step items
+    const stepClone = document.getElementById("stepClone");
+    const stepRead = document.getElementById("stepRead");
+    const stepEmbed = document.getElementById("stepEmbed");
+    const stepIndex = document.getElementById("stepIndex");
+    const stepSummary = document.getElementById("stepSummary");
+
+    // Initialize Page
+    document.addEventListener("DOMContentLoaded", () => {
+      checkServerStatus();
+      setupEventListeners();
+    });
+
+    // Setup Event Listeners
+    function setupEventListeners() {
+      // GitHub URL Validation on input
+      repoUrlInput.addEventListener("input", handleUrlInput);
+      
+      // Indexing Trigger
+      btnIndex.addEventListener("click", indexRepository);
+      
+      // Auto-grow Chat Textarea & Character Count
+      chatInput.addEventListener("input", handleChatInput);
+      
+      // Chat key listener (Enter to send, Shift+Enter for new line)
+      chatInput.addEventListener("keydown", handleChatKeydown);
+      
+      // Send button
+      btnSendChat.addEventListener("click", () => sendQuery(chatInput.value.trim()));
+      
+      // Toggle Conversation Mode
+      conversationModeToggle.addEventListener("click", toggleConversationMode);
+      
+      // Welcome prompt chips
+      document.querySelectorAll(".suggestion-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const question = chip.getAttribute("data-question");
+          if (!state.isIndexed) {
+            alert("Please index a public GitHub repository first!");
+            repoUrlInput.focus();
+            return;
+          }
+          chatInput.value = question;
+          handleChatInput();
+          sendQuery(question);
+        });
+      });
+
+      // Filter File Tree
+      treeSearchInput.addEventListener("input", filterFileTree);
+
+      // Keyboard Shortcuts
+      document.addEventListener("keydown", (e) => {
+        // Ctrl+K -> Focus Repo Input
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          repoUrlInput.focus();
+          repoUrlInput.select();
+        }
+        // Ctrl+L -> Clear Chat
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l") {
+          e.preventDefault();
+          clearChat();
+        }
+      });
+    }
+
+    // Server Healthcheck & initial load
+    async function checkServerStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/api/status`);
+        if (!response.ok) throw new Error("Backend response error");
+        
+        const data = await response.json();
+        console.log("[CodeLens] Checked status:", data);
+        
+        if (data.indexed) {
+          state.isIndexed = true;
+          state.repoName = data.repo_name;
+          state.filesCount = data.files;
+          state.chunksCount = data.chunks;
+          
+          updateUIWithIndexedState();
+          loadFileTree();
+        }
+      } catch (err) {
+        console.error("[CodeLens] Status check failed:", err);
+        statusPill.className = "status-pill";
+        statusText.innerText = "Connection lost. Check your network.";
+        statusText.style.color = "var(--red)";
+      }
+    }
+
+    // GitHub URL pattern matcher
+    function isValidGithubUrl(url) {
+      const regex = /^https:\/\/(www\.)?github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+(\/)?$/;
+      return regex.test(url);
+    }
+
+    function handleUrlInput() {
+      const url = repoUrlInput.value.trim();
+      if (!url) {
+        validationIndicator.innerHTML = "";
+        btnIndex.disabled = true;
+        return;
+      }
+      
+      if (isValidGithubUrl(url)) {
+        validationIndicator.innerHTML = '<span class="validation-success">✓</span>';
+        btnIndex.disabled = false;
+      } else {
+        validationIndicator.innerHTML = '<span class="validation-error">✗</span>';
+        btnIndex.disabled = true;
+      }
+    }
+
+    // Auto-grow textarea
+    function handleChatInput() {
+      chatInput.style.height = "auto";
+      chatInput.style.height = (chatInput.scrollHeight) + "px";
+      charCounter.innerText = chatInput.value.length;
+      btnSendChat.disabled = chatInput.value.trim().length === 0;
+    }
+
+    function handleChatKeydown(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (text) {
+          sendQuery(text);
+        }
+      }
+    }
+
+    function toggleConversationMode() {
+      state.conversationMode = !state.conversationMode;
+      conversationModeToggle.classList.toggle("active", state.conversationMode);
+      console.log("[CodeLens] Conversation mode is now:", state.conversationMode);
+    }
+
+    // Index Repository
+    async function indexRepository() {
+      const repoUrl = repoUrlInput.value.trim();
+      const branch = repoBranchInput.value.trim() || "main";
+      
+      if (!isValidGithubUrl(repoUrl)) {
+        alert("Please enter a valid GitHub repository URL");
+        return;
+      }
+
+      console.log("[CodeLens] Triggering index on:", repoUrl, "branch:", branch);
+      
+      // Update UI to Indexing State
+      state.isIndexed = false;
+      btnIndex.disabled = true;
+      repoUrlInput.disabled = true;
+      repoBranchInput.disabled = true;
+      
+      statusPill.className = "status-pill loading";
+      statusText.innerText = "Indexing codebase...";
+      
+      // Reset overlay steps
+      indexingOverlay.classList.add("active");
+      resetProgressSteps();
+      
+      // Fake progress step increments (based on standard timings)
+      setActiveStep(stepClone);
+      indexingSubtitle.innerText = `Cloning repository: ${repoUrl}`;
+      
+      let progressTimer;
+      let durationSeconds = 0;
+      
+      progressTimer = setInterval(() => {
+        durationSeconds++;
+        if (durationSeconds === 4) {
+          setCompletedStep(stepClone);
+          setActiveStep(stepRead);
+          indexingSubtitle.innerText = "Scanning project folder structure & filtering files...";
+        } else if (durationSeconds === 7) {
+          setCompletedStep(stepRead);
+          setActiveStep(stepEmbed);
+          indexingSubtitle.innerText = "Creating recursive character chunks & embedding vectors via Gemini...";
+        } else if (durationSeconds === 15) {
+          setCompletedStep(stepEmbed);
+          setActiveStep(stepIndex);
+          indexingSubtitle.innerText = "Populating vector space index (FAISS FlatIP)...";
+        } else if (durationSeconds === 20) {
+          setCompletedStep(stepIndex);
+          setActiveStep(stepSummary);
+          indexingSubtitle.innerText = "Generating high-level codebase structure and architectural summary...";
+        }
+      }, 1000);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/index`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repo_url: repoUrl, branch: branch })
+        });
+
+        clearInterval(progressTimer);
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || "Indexing failed");
+        }
+
+        const data = await response.json();
+        console.log("[CodeLens] Indexing complete response:", data);
+        
+        // Update all progress steps to completed
+        setCompletedStep(stepClone);
+        setCompletedStep(stepRead);
+        setCompletedStep(stepEmbed);
+        setCompletedStep(stepIndex);
+        setCompletedStep(stepSummary);
+        indexingSubtitle.innerText = "Index completed successfully!";
+        
+        state.isIndexed = true;
+        state.repoName = getRepoName(repoUrl);
+        state.filesCount = data.files_indexed;
+        state.chunksCount = data.chunks_created;
+        
+        // Render Summary
+        repoSummaryBanner.classList.remove("hidden");
+        repoSummaryText.innerText = data.repo_summary;
+        
+        // Save tree data and render tree
+        state.fileTreeData = data.file_tree;
+        renderFileTree(data.file_tree);
+        
+        updateUIWithIndexedState();
+        
+        // Dismiss overlay
+        setTimeout(() => {
+          indexingOverlay.classList.remove("active");
+          chatInput.focus();
+        }, 1200);
+
+      } catch (err) {
+        clearInterval(progressTimer);
+        console.error("[CodeLens] Indexing failed error:", err);
+        
+        // Hide overlay, reset forms
+        indexingOverlay.classList.remove("active");
+        btnIndex.disabled = false;
+        repoUrlInput.disabled = false;
+        repoBranchInput.disabled = false;
+        
+        statusPill.className = "status-pill";
+        statusText.innerText = "Indexing error";
+        statusText.style.color = "var(--red)";
+        
+        alert(`Indexing failed: ${err.message}`);
+      }
+    }
+
+    // Step-by-step styling functions
+    function resetProgressSteps() {
+      [stepClone, stepRead, stepEmbed, stepIndex, stepSummary].forEach(step => {
+        step.className = "step-item";
+      });
+    }
+    
+    function setActiveStep(stepElement) {
+      stepElement.className = "step-item active";
+    }
+    
+    function setCompletedStep(stepElement) {
+      stepElement.className = "step-item completed";
+    }
+
+    function updateUIWithIndexedState() {
+      // Form fields
+      repoUrlInput.disabled = false;
+      repoBranchInput.disabled = false;
+      btnIndex.disabled = false;
+      
+      // Status pill
+      statusPill.className = "status-pill ready";
+      statusText.innerText = `${state.chunksCount.toLocaleString()} chunks · ${state.filesCount} files`;
+      statusText.style.color = "var(--text-primary)";
+      
+      // Enable chat inputs
+      chatInput.disabled = false;
+      chatInput.placeholder = `Ask a question about ${state.repoName}...`;
+      
+      // Remove welcome screen if history exists
+      if (state.chatHistory.length > 0) {
+        welcomeScreen.style.display = "none";
+      }
+    }
+
+    // Load file tree from api
+    async function loadFileTree() {
+      treeShimmer.style.display = "block";
+      treeEmptyState.style.display = "none";
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/filetree`);
+        if (!response.ok) throw new Error("Failed to load file tree");
+        
+        const data = await response.json();
+        state.fileTreeData = data;
+        renderFileTree(data);
+      } catch (err) {
+        console.error("[CodeLens] Tree fetch error:", err);
+        treeEmptyState.style.display = "block";
+        treeEmptyState.innerText = "Error loading files tree.";
+      } finally {
+        treeShimmer.style.display = "none";
+      }
+    }
+
+    // Build icons based on file type
+    function getFileIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      switch(ext) {
+        case 'py': return '🐍';
+        case 'js': return '⚡';
+        case 'ts': return '🔷';
+        case 'jsx': 
+        case 'tsx': return '⚛';
+        case 'java': return '☕';
+        case 'md': return '📄';
+        default: return '📄';
+      }
+    }
+
+    // Recursively render file tree
+    function renderFileTree(nodes) {
+      treeEmptyState.style.display = "none";
+      treeContainer.innerHTML = "";
+      
+      const ul = document.createElement("ul");
+      ul.className = "tree-list";
+      
+      nodes.forEach(node => {
+        ul.appendChild(createTreeNode(node));
+      });
+      
+      treeContainer.appendChild(ul);
+      fileCountText.innerText = `${state.filesCount} files`;
+    }
+
+    function createTreeNode(node) {
+      const li = document.createElement("li");
+      li.className = "tree-item";
+      li.setAttribute("data-path", node.path);
+      
+      const content = document.createElement("div");
+      content.className = "tree-node-content";
+      
+      // Folder or file properties
+      if (node.type === "directory") {
+        content.innerHTML = `
+          <span class="tree-arrow">▼</span>
+          <span class="tree-icon">📁</span>
+          <span>${node.name}</span>
+        `;
+        
+        const subList = document.createElement("ul");
+        subList.className = "tree-list";
+        
+        node.children.forEach(child => {
+          subList.appendChild(createTreeNode(child));
+        });
+        
+        li.appendChild(content);
+        li.appendChild(subList);
+        
+        // Collapse toggle listener
+        content.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const arrow = content.querySelector(".tree-arrow");
+          arrow.classList.toggle("collapsed");
+          subList.style.display = subList.style.display === "none" ? "block" : "none";
+        });
+      } else {
+        const icon = getFileIcon(node.name);
+        content.innerHTML = `
+          <span class="tree-arrow"></span>
+          <span class="tree-icon">${icon}</span>
+          <span>${node.name}</span>
+        `;
+        
+        // Active file highlight listener
+        content.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // Remove active class from all nodes
+          document.querySelectorAll(".tree-node-content").forEach(el => el.classList.remove("active"));
+          content.classList.add("active");
+          
+          toggleFocusedFile(node.path);
+        });
+        
+        li.appendChild(content);
+      }
+      
+      return li;
+    }
+
+    function toggleFocusedFile(path) {
+      if (state.focusedFiles.has(path)) {
+        state.focusedFiles.delete(path);
+        console.log("[CodeLens] Removed focused file:", path);
+      } else {
+        state.focusedFiles.clear(); // Visual selection highlights single file context
+        state.focusedFiles.add(path);
+        console.log("[CodeLens] Added focused file:", path);
+      }
+    }
+
+    // Filter file tree on search
+    function filterFileTree() {
+      const query = treeSearchInput.value.trim().toLowerCase();
+      const treeItems = treeContainer.querySelectorAll(".tree-item");
+      
+      if (!query) {
+        // Show everything, return directories to visible
+        treeItems.forEach(item => {
+          item.style.display = "block";
+          const subList = item.querySelector(".tree-list");
+          if (subList) subList.style.display = "block";
+          const arrow = item.querySelector(".tree-arrow");
+          if (arrow) arrow.classList.remove("collapsed");
+        });
+        return;
+      }
+      
+      // Helper recursive filter function
+      function matchNode(nodeElement) {
+        const contentEl = nodeElement.querySelector(".tree-node-content");
+        const nodeName = contentEl.querySelector("span:last-child").innerText.toLowerCase();
+        const subList = nodeElement.querySelector(".tree-list");
+        
+        let match = false;
+        
+        if (subList) {
+          // Directory node: check if children match
+          const children = subList.querySelectorAll(":scope > .tree-item");
+          let childMatchCount = 0;
+          
+          children.forEach(child => {
+            if (matchNode(child)) {
+              childMatchCount++;
+              match = true;
+            }
+          });
+          
+          if (match) {
+            nodeElement.style.display = "block";
+            subList.style.display = "block";
+            const arrow = nodeElement.querySelector(".tree-arrow");
+            if (arrow) arrow.classList.remove("collapsed");
+          } else {
+            nodeElement.style.display = "none";
+          }
+        } else {
+          // File node
+          match = nodeName.includes(query);
+          nodeElement.style.display = match ? "block" : "none";
+        }
+        
+        return match;
+      }
+
+      const topLevels = treeContainer.querySelectorAll(".tree-container > .tree-list > .tree-item");
+      topLevels.forEach(node => {
+        matchNode(node);
+      });
+    }
+
+    // Send chat question
+    async function sendQuery(question) {
+      if (!state.isIndexed) {
+        alert("Please index a codebase first!");
+        return;
+      }
+
+      console.log("[CodeLens] Sending question:", question, "ConvMode:", state.conversationMode);
+      
+      // Add user message to UI
+      welcomeScreen.style.display = "none";
+      appendMessage("user", question);
+      
+      // Clear Input
+      chatInput.value = "";
+      handleChatInput();
+      
+      // Disable sending
+      chatInput.disabled = true;
+      btnSendChat.disabled = true;
+      
+      // Append skeleton loader
+      const loaderId = appendSkeletonLoader();
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      
+      // Prepare endpoint and payload
+      let endpoint = `${API_BASE}/api/query`;
+      let payload = { question: question };
+      
+      if (state.conversationMode) {
+        endpoint = `${API_BASE}/api/chat`;
+        state.chatHistory.push({ role: "user", content: question });
+        payload = { messages: state.chatHistory };
+      }
+
+      const startTime = performance.now();
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error("Query failed");
+
+        const data = await response.json();
+        const duration = (performance.now() - startTime).toFixed(1);
+        console.log(`[CodeLens] Query completed in ${duration}ms. Retreived ${data.chunks_used} chunks.`);
+
+        // Remove skeleton loader
+        removeSkeletonLoader(loaderId);
+
+        // Render response
+        appendMessage("assistant", data.answer);
+        
+        if (state.conversationMode) {
+          state.chatHistory.push({ role: "model", content: data.answer });
+        }
+        
+        // Render Sources in right panel
+        renderSources(data.sources, data.chunks_used);
+        
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      } catch (err) {
+        console.error("[CodeLens] Query failed error:", err);
+        removeSkeletonLoader(loaderId);
+        
+        appendMessage("assistant", "⚠️ Error: Failed to generate a response from the model. Please verify your connection.");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      } finally {
+        chatInput.disabled = false;
+        btnSendChat.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    // Append Chat Bubble
+    function appendMessage(role, text) {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `message ${role}`;
+      
+      const header = document.createElement("div");
+      header.className = "message-header";
+      
+      if (role === "user") {
+        header.innerHTML = `
+          <span>You</span>
+          <!-- User Icon SVG -->
+          <svg class="svg-icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        `;
+      } else {
+        header.innerHTML = `
+          <!-- Bot Icon SVG -->
+          <svg class="svg-icon" style="width:12px; height:12px; color: var(--accent-color);" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          <span>CodeLens</span>
+        `;
+      }
+
+      const body = document.createElement("div");
+      body.className = "message-body";
+      
+      if (role === "user") {
+        body.innerText = text;
+      } else {
+        // Parse markdown using marked.js
+        const rawHtml = marked.parse(text);
+        
+        // Format [file.py] patterns as inline badged spans
+        const citationFormattedHtml = rawHtml.replace(
+          /\[([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)\]/g, 
+          `<span class="file-badge" onclick="locateFileInTree('$1')">$1</span>`
+        );
+        
+        body.innerHTML = citationFormattedHtml;
+        
+        // Syntax Highlight code blocks
+        body.querySelectorAll('pre code').forEach((block) => {
+          hljs.highlightElement(block);
+        });
+        
+        // Add Copy Button overlay
+        body.querySelectorAll('pre').forEach((pre) => {
+          const btn = document.createElement("button");
+          btn.className = "copy-btn";
+          btn.innerText = "Copy";
+          btn.addEventListener("click", () => {
+            const code = pre.querySelector("code").innerText;
+            navigator.clipboard.writeText(code).then(() => {
+              btn.innerText = "Copied!";
+              setTimeout(() => { btn.innerText = "Copy"; }, 2000);
+            });
+          });
+          pre.appendChild(btn);
+        });
+      }
+
+      msgDiv.appendChild(header);
+      msgDiv.appendChild(body);
+      chatContainer.appendChild(msgDiv);
+    }
+
+    // Loader animation append/remove
+    function appendSkeletonLoader() {
+      const loaderId = `loader_${Date.now()}`;
+      const loaderDiv = document.createElement("div");
+      loaderDiv.className = "skeleton-message";
+      loaderDiv.id = loaderId;
+      loaderDiv.innerHTML = `
+        <div class="message-header">
+          <svg class="svg-icon" style="width:12px; height:12px; color: var(--accent-color);" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          <span>CodeLens is analyzing...</span>
+        </div>
+        <div class="bubble">
+          <div class="skeleton-bar" style="width: 90%;"></div>
+          <div class="skeleton-bar" style="width: 75%;"></div>
+          <div class="skeleton-bar" style="width: 60%;"></div>
+        </div>
+      `;
+      chatContainer.appendChild(loaderDiv);
+      return loaderId;
+    }
+
+    function removeSkeletonLoader(id) {
+      const loader = document.getElementById(id);
+      if (loader) loader.remove();
+    }
+
+    // Render Sources in Right Panel
+    function renderSources(sources, chunksUsed) {
+      sourcesEmptyState.style.display = "none";
+      sourcesContainer.innerHTML = "";
+      
+      chunksAnalyzedText.innerText = `Chunks analyzed: ${sources.length} of ${state.chunksCount}`;
+      
+      sources.forEach(src => {
+        const card = document.createElement("div");
+        card.className = "source-card";
+        
+        // Confidence color classification
+        let colorClass = "low";
+        if (src.score >= 0.7) colorClass = "high";
+        else if (src.score >= 0.45) colorClass = "med";
+        
+        const ext = src.file.split('.').pop();
+        const icon = getFileIcon(src.file);
+
+        card.innerHTML = `
+          <div class="source-header">
+            <span class="source-filename" title="${src.file}">${icon} ${src.file}</span>
+            <span class="source-badge">L${src.start_line}</span>
+          </div>
+          <div class="source-preview">${escapeHtml(src.preview)}</div>
+          <div class="source-footer">
+            <div class="confidence-wrapper">
+              <div class="confidence-label">
+                <span>Score</span>
+                <span>${(src.score).toFixed(2)}</span>
+              </div>
+              <div class="confidence-bar">
+                <div class="confidence-fill ${colorClass}" style="width: ${src.score * 100}%"></div>
+              </div>
+            </div>
+            <button class="btn-view-context" onclick="locateFileInTree('${src.file}')">View in Context</button>
+          </div>
+        `;
+        sourcesContainer.appendChild(card);
+      });
+    }
+
+    // Helper to find a file path in tree nodes and scroll/highlight it
+    function locateFileInTree(filePath) {
+      console.log("[CodeLens] Locating file in tree:", filePath);
+      
+      // Clean leading/trailing quotes or slash
+      filePath = filePath.replace(/['"\[\]]/g, '').trim();
+      
+      // Split path to find sub-nodes
+      const parts = filePath.split('/');
+      let currentPath = "";
+      
+      // Recursively expand tree folders
+      parts.forEach((part, index) => {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        const itemEl = document.querySelector(`.tree-item[data-path="${currentPath}"]`);
+        
+        if (itemEl) {
+          const subList = itemEl.querySelector(".tree-list");
+          if (subList && subList.style.display === "none") {
+            subList.style.display = "block";
+            const arrow = itemEl.querySelector(".tree-arrow");
+            if (arrow) arrow.classList.remove("collapsed");
+          }
+          
+          // If last part (it's the file), scroll it and flash highlight
+          if (index === parts.length - 1) {
+            const contentNode = itemEl.querySelector(".tree-node-content");
+            
+            // Remove active from others
+            document.querySelectorAll(".tree-node-content").forEach(el => el.classList.remove("active"));
+            
+            contentNode.classList.add("active");
+            contentNode.scrollIntoView({ behavior: "smooth", block: "center" });
+            
+            // Add flash effect
+            contentNode.classList.remove("flash-highlight");
+            void contentNode.offsetWidth; // Trigger reflow to restart animation
+            contentNode.classList.add("flash-highlight");
+          }
+        }
+      });
+    }
+
+    // Clear Chat UI and State
+    function clearChat() {
+      chatContainer.innerHTML = "";
+      state.chatHistory = [];
+      welcomeScreen.style.display = "flex";
+      chatContainer.appendChild(welcomeScreen);
+      
+      sourcesContainer.innerHTML = "";
+      sourcesEmptyState.style.display = "block";
+      chunksAnalyzedText.innerText = "Analyzed: 0 chunks";
+      
+      console.log("[CodeLens] Chat cleared.");
+    }
+
+    // Utility Helpers
+    function getRepoName(url) {
+      const urlStripped = url.replace(/\/$/, "");
+      return urlStripped.split("/").pop();
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
