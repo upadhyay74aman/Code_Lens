@@ -1854,45 +1854,71 @@
 
       const startTime = performance.now();
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+      const maxRetries = 2;
+      let lastError = null;
 
-        if (!response.ok) throw new Error("Query failed");
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[CodeLens] Query attempt ${attempt}/${maxRetries}...`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
 
-        const data = await response.json();
-        const duration = (performance.now() - startTime).toFixed(1);
-        console.log(`[CodeLens] Query completed in ${duration}ms. Retreived ${data.chunks_used} chunks.`);
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
 
-        // Remove skeleton loader
-        removeSkeletonLoader(loaderId);
+          clearTimeout(timeoutId);
 
-        // Render response
-        appendMessage("assistant", data.answer);
-        
-        if (state.conversationMode) {
-          state.chatHistory.push({ role: "model", content: data.answer });
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `Server error ${response.status}`);
+          }
+
+          const data = await response.json();
+          const duration = (performance.now() - startTime).toFixed(1);
+          console.log(`[CodeLens] Query completed in ${duration}ms. Retrieved ${data.chunks_used} chunks.`);
+
+          // Remove skeleton loader
+          removeSkeletonLoader(loaderId);
+
+          // Render response
+          appendMessage("assistant", data.answer);
+          
+          if (state.conversationMode) {
+            state.chatHistory.push({ role: "model", content: data.answer });
+          }
+          
+          // Render Sources in right panel
+          renderSources(data.sources, data.chunks_used);
+          
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+          lastError = null;
+          break; // Success — exit retry loop
+
+        } catch (err) {
+          console.warn(`[CodeLens] Query attempt ${attempt} failed:`, err.message);
+          lastError = err;
+          if (attempt < maxRetries) {
+            // Wait before retry
+            await new Promise(r => setTimeout(r, 3000));
+          }
         }
-        
-        // Render Sources in right panel
-        renderSources(data.sources, data.chunks_used);
-        
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-
-      } catch (err) {
-        console.error("[CodeLens] Query failed error:", err);
-        removeSkeletonLoader(loaderId);
-        
-        appendMessage("assistant", "⚠️ Error: Failed to generate a response from the model. Please verify your connection.");
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-      } finally {
-        chatInput.disabled = false;
-        btnSendChat.disabled = false;
-        chatInput.focus();
       }
+
+      if (lastError) {
+        console.error("[CodeLens] All query attempts failed:", lastError);
+        removeSkeletonLoader(loaderId);
+        appendMessage("assistant", "⚠️ Error: The query timed out or failed. This may happen on free hosting due to request limits. Please try again — the server may need a moment to warm up.");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      // Re-enable input
+      chatInput.disabled = false;
+      btnSendChat.disabled = false;
+      chatInput.focus();
     }
 
     // Append Chat Bubble
