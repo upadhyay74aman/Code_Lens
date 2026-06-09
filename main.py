@@ -134,7 +134,7 @@ def build_file_tree(file_paths: List[str]) -> List[Dict[str, Any]]:
 
 def generate_content_with_fallback(contents, system_instruction=None):
     """Generates content using Gemini models, trying multiple models in case of quota exhaustion."""
-    models_to_try = ["models/gemini-flash-latest", "models/gemini-2.0-flash", "models/gemini-2.5-flash"]
+    models_to_try = ["models/gemini-2.0-flash", "models/gemini-2.5-flash"]
     last_err = None
     for model_name in models_to_try:
         try:

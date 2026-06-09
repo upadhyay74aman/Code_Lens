@@ -1484,12 +1484,17 @@
       }, 1000);
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min client timeout
+
         const response = await fetch(`${API_BASE}/api/index`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repo_url: repoUrl, branch: branch })
+          body: JSON.stringify({ repo_url: repoUrl, branch: branch }),
+          signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
         clearInterval(progressTimer);
 
         if (!response.ok) {
@@ -1500,51 +1505,100 @@
         const data = await response.json();
         console.log("[CodeLens] Indexing complete response:", data);
         
-        // Update all progress steps to completed
-        setCompletedStep(stepClone);
-        setCompletedStep(stepRead);
-        setCompletedStep(stepEmbed);
-        setCompletedStep(stepIndex);
-        setCompletedStep(stepSummary);
-        indexingSubtitle.innerText = "Index completed successfully!";
-        
-        state.isIndexed = true;
-        state.repoName = getRepoName(repoUrl);
-        state.filesCount = data.files_indexed;
-        state.chunksCount = data.chunks_created;
-        
-        // Render Summary
-        repoSummaryBanner.classList.remove("hidden");
-        repoSummaryText.innerText = data.repo_summary;
-        
-        // Save tree data and render tree
-        state.fileTreeData = data.file_tree;
-        renderFileTree(data.file_tree);
-        
-        updateUIWithIndexedState();
-        
-        // Dismiss overlay
-        setTimeout(() => {
-          indexingOverlay.classList.remove("active");
-          chatInput.focus();
-        }, 1200);
+        handleIndexingSuccess(data, repoUrl);
 
       } catch (err) {
         clearInterval(progressTimer);
-        console.error("[CodeLens] Indexing failed error:", err);
+        console.warn("[CodeLens] Index fetch failed (may be proxy timeout), starting poll fallback:", err.message);
         
-        // Hide overlay, reset forms
-        indexingOverlay.classList.remove("active");
-        btnIndex.disabled = false;
-        repoUrlInput.disabled = false;
-        repoBranchInput.disabled = false;
+        // Render free tier kills requests after ~30s, but the backend keeps processing.
+        // Poll /api/status every 5s to detect when indexing finishes on the server.
+        indexingSubtitle.innerText = "Server is still processing... waiting for completion...";
+        setCompletedStep(stepClone);
+        setCompletedStep(stepRead);
+        setCompletedStep(stepEmbed);
+        setActiveStep(stepIndex);
         
-        statusPill.className = "status-pill";
-        statusText.innerText = "Indexing error";
-        statusText.style.color = "var(--red)";
+        let pollAttempts = 0;
+        const maxPollAttempts = 60; // 5 minutes max
         
-        alert(`Indexing failed: ${err.message}`);
+        const pollTimer = setInterval(async () => {
+          pollAttempts++;
+          try {
+            const statusRes = await fetch(`${API_BASE}/api/status`);
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              console.log("[CodeLens] Poll status:", statusData);
+              
+              if (statusData.indexed) {
+                clearInterval(pollTimer);
+                
+                // Fetch the file tree separately
+                let treeData = [];
+                try {
+                  const treeRes = await fetch(`${API_BASE}/api/filetree`);
+                  if (treeRes.ok) treeData = await treeRes.json();
+                } catch (e) { console.warn("[CodeLens] Tree fetch failed:", e); }
+                
+                handleIndexingSuccess({
+                  files_indexed: statusData.files,
+                  chunks_created: statusData.chunks,
+                  repo_summary: `Repository "${statusData.repo_name}" indexed successfully with ${statusData.files} files and ${statusData.chunks} chunks.`,
+                  file_tree: treeData
+                }, repoUrl);
+              }
+            }
+          } catch (pollErr) {
+            console.warn("[CodeLens] Poll attempt failed:", pollErr.message);
+          }
+          
+          if (pollAttempts >= maxPollAttempts) {
+            clearInterval(pollTimer);
+            indexingOverlay.classList.remove("active");
+            btnIndex.disabled = false;
+            repoUrlInput.disabled = false;
+            repoBranchInput.disabled = false;
+            statusPill.className = "status-pill";
+            statusText.innerText = "Indexing timed out";
+            statusText.style.color = "var(--red)";
+            alert("Indexing timed out. The repository may be too large. Try a smaller repo.");
+          }
+        }, 5000);
       }
+    }
+
+    // Shared success handler for indexing (used by both direct response and poll fallback)
+    function handleIndexingSuccess(data, repoUrl) {
+      // Update all progress steps to completed
+      setCompletedStep(stepClone);
+      setCompletedStep(stepRead);
+      setCompletedStep(stepEmbed);
+      setCompletedStep(stepIndex);
+      setCompletedStep(stepSummary);
+      indexingSubtitle.innerText = "Index completed successfully!";
+      
+      state.isIndexed = true;
+      state.repoName = getRepoName(repoUrl);
+      state.filesCount = data.files_indexed;
+      state.chunksCount = data.chunks_created;
+      
+      // Render Summary
+      repoSummaryBanner.classList.remove("hidden");
+      repoSummaryText.innerText = data.repo_summary;
+      
+      // Save tree data and render tree
+      if (data.file_tree && data.file_tree.length > 0) {
+        state.fileTreeData = data.file_tree;
+        renderFileTree(data.file_tree);
+      }
+      
+      updateUIWithIndexedState();
+      
+      // Dismiss overlay
+      setTimeout(() => {
+        indexingOverlay.classList.remove("active");
+        chatInput.focus();
+      }, 1200);
     }
 
     // Step-by-step styling functions
