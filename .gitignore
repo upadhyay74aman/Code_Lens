@@ -21,3 +21,9 @@ Thumbs.db
 
 # Temp cloned repos
 /tmp/
+
+# Go Parser Build Artifacts
+codelens-parser
+codelens-parser.exe
+go_dist/
+

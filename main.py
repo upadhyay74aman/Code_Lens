@@ -156,10 +156,54 @@ def generate_content_with_fallback(contents, system_instruction=None):
     raise last_err
 
 
+def get_parser_binary() -> str:
+    """Finds or compiles the Go parser binary, returns its path."""
+    import subprocess
+    import sys
+    import shutil
+    
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+    binary_name = "codelens-parser.exe" if sys.platform.startswith("win") else "codelens-parser"
+    binary_path = os.path.join(dir_path, binary_name)
+    
+    if os.path.exists(binary_path):
+        return binary_path
+        
+    # If not found, check if 'go' is in PATH to compile it
+    go_path = shutil.which("go")
+    if go_path:
+        print(f"[CodeLens] Binary {binary_name} not found, compiling using system Go...")
+        try:
+            main_go_path = os.path.join(dir_path, "parser", "main.go")
+            subprocess.run([go_path, "build", "-o", binary_path, main_go_path], check=True)
+            return binary_path
+        except Exception as e:
+            print(f"[CodeLens] Dynamic compilation failed: {e}")
+            
+    # Also check if we have local go_dist
+    local_go = os.path.join(dir_path, "go_dist", "go", "bin", "go" + (".exe" if sys.platform.startswith("win") else ""))
+    if os.path.exists(local_go):
+        print(f"[CodeLens] Binary not found, compiling using local Go distribution...")
+        try:
+            main_go_path = os.path.join(dir_path, "parser", "main.go")
+            subprocess.run([local_go, "build", "-o", binary_path, main_go_path], check=True)
+            return binary_path
+        except Exception as e:
+            print(f"[CodeLens] Local compilation failed: {e}")
+            
+    raise RuntimeError(
+        f"Go parser binary not found at {binary_path} and could not compile it. "
+        "Please compile parser/main.go or make sure Go is installed."
+    )
+
+
 @app.post("/api/index")
 async def index_repository(request: IndexRequest):
     """Clones a GitHub repository, processes text files, generates embeddings, and creates a search index."""
     global indexed_repo_name, indexed_repo_url, indexed_branch, all_file_paths, file_tree, faiss_index, chunk_metadata, chunk_contents, repo_summary, is_indexed
+    
+    import subprocess
+    import json
     
     # Reload/configure API key dynamically in case it was added to .env after server startup
     api_key_check = os.getenv("GEMINI_API_KEY")
@@ -175,117 +219,59 @@ async def index_repository(request: IndexRequest):
     print(f"[CodeLens] Cleaning existing temp folder: {temp_dir}")
     safe_rmtree(temp_dir)
 
-    # 1. Clone repository
-    print(f"[CodeLens] Cloning repository: {request.repo_url} (branch: {request.branch})")
+    # 1. Locate and run Go parser CLI
     try:
-        # Clone repo using GitPython
-        git.Repo.clone_from(request.repo_url, temp_dir, branch=request.branch)
-    except git.exc.GitCommandError as e:
-        print(f"[CodeLens] Git clone error: {e}")
-        # Clean up directory on failure
-        safe_rmtree(temp_dir)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to clone repository. Make sure the repository is public and the branch exists. Error details: {str(e)}"
-        )
+        binary_path = get_parser_binary()
     except Exception as e:
-        print(f"[CodeLens] Unexpected clone error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    print(f"[CodeLens] Invoking Go parser for {request.repo_url}...")
+    cmd = [
+        binary_path,
+        "--repo-url", request.repo_url,
+        "--branch", request.branch,
+        "--temp-dir", temp_dir
+    ]
+
+    try:
+        # Run Go parser CLI
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    except Exception as e:
         safe_rmtree(temp_dir)
-        raise HTTPException(status_code=500, detail=f"Unexpected error during git clone: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute Go parser binary: {e}")
 
-    # 2. Walk files recursively matching allowed extensions
-    skip_dirs = {"node_modules", ".git", "__pycache__", "dist", "build", ".next", "venv", "env"}
-    allowed_extensions = {
-        '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', 
-        '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.md'
-    }
-    
-    print("[CodeLens] Reading repository files...")
-    file_list = []
-    for root, dirs, files in os.walk(temp_dir):
-        # Modify dirs in-place to prevent os.walk from entering skipped directories
-        dirs[:] = [d for d in dirs if d not in skip_dirs]
-        for file in files:
-            ext = os.path.splitext(file)[1].lower()
-            if ext in allowed_extensions:
-                file_list.append(os.path.join(root, file))
-
-    if not file_list:
+    if result.returncode != 0 or not result.stdout:
         safe_rmtree(temp_dir)
-        raise HTTPException(
-            status_code=400, 
-            detail="No files matching the supported extensions found in this repository (.py, .js, .ts, etc.)."
-        )
+        err_msg = result.stderr or f"Go parser exited with code {result.returncode}"
+        raise HTTPException(status_code=500, detail=f"Go parser execution error: {err_msg}")
 
-    print(f"[CodeLens] Found {len(file_list)} matching files to index.")
+    try:
+        data = json.loads(result.stdout)
+    except Exception as e:
+        safe_rmtree(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Go parser returned invalid JSON: {result.stdout[:500]}")
 
-    # 3. Read and split files
-    print("[CodeLens] Splitting files into character chunks...")
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    
-    local_chunks = []
-    local_meta = []
-    
-    extension_map = {
-        '.py': 'python',
-        '.js': 'javascript',
-        '.ts': 'typescript',
-        '.jsx': 'jsx',
-        '.tsx': 'tsx',
-        '.java': 'java',
-        '.cpp': 'cpp',
-        '.c': 'c',
-        '.cs': 'csharp',
-        '.go': 'go',
-        '.rs': 'rust',
-        '.rb': 'ruby',
-        '.php': 'php',
-        '.swift': 'swift',
-        '.kt': 'kotlin',
-        '.md': 'markdown'
-    }
+    if data.get("status") == "error":
+        safe_rmtree(temp_dir)
+        raise HTTPException(status_code=400, detail=data.get("detail", "Unknown error during parsing."))
 
-    for full_path in file_list:
-        rel_path = os.path.relpath(full_path, temp_dir).replace('\\', '/')
-        ext = os.path.splitext(full_path)[1].lower()
-        lang = extension_map.get(ext, 'text')
-        
-        try:
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-        except Exception as file_err:
-            print(f"[CodeLens] Warning: Failed to read {rel_path} - {file_err}")
-            continue
-            
-        file_chunks = splitter.split_text(content)
-        
-        last_pos = 0
-        for idx, chunk_text in enumerate(file_chunks):
-            # Calculate the line number of this chunk in the original file
-            pos = content.find(chunk_text, last_pos)
-            if pos == -1:
-                pos = content.find(chunk_text)
-                
-            if pos != -1:
-                start_line = content[:pos].count('\n') + 1
-                last_pos = pos + len(chunk_text)
-            else:
-                start_line = 1
-                
-            local_chunks.append(chunk_text)
-            local_meta.append({
-                "file_path": rel_path,
-                "start_line": start_line,
-                "language": lang,
-                "chunk_index": idx
-            })
+    # 2. Extract Go parser output
+    local_chunks = [c["content"] for c in data["chunks"]]
+    local_meta = [{
+        "file_path": c["file_path"],
+        "start_line": c["start_line"],
+        "language": c["language"],
+        "chunk_index": c["chunk_index"]
+    } for c in data["chunks"]]
 
-    if not local_chunks:
-        raise HTTPException(status_code=400, detail="Failed to parse text from any repository files.")
+    files_indexed = data["files_indexed"]
+    chunks_created = data["chunks_created"]
+    file_tree_data = data["file_tree"]
+    readme_snippet = data["readme_snippet"]
 
-    print(f"[CodeLens] Created {len(local_chunks)} text chunks.")
+    relative_paths = sorted(list(set(c["file_path"] for c in data["chunks"])))
 
-    # 4. Generate embeddings using Gemini
+    # 3. Generate embeddings using Gemini
     print("[CodeLens] Generating embeddings using Gemini models/embedding-001...")
     embeddings = []
     batch_size = 100
@@ -306,7 +292,7 @@ async def index_repository(request: IndexRequest):
                 detail=f"Gemini API error during embedding generation: {str(embed_err)}"
             )
 
-    # 5. Build FAISS index (inner product flat index)
+    # 4. Build FAISS index (inner product flat index)
     print("[CodeLens] Building FAISS search index...")
     dimension = len(embeddings[0])
     vectors = np.array(embeddings).astype('float32')
@@ -315,24 +301,8 @@ async def index_repository(request: IndexRequest):
     new_faiss_index = faiss.IndexFlatIP(dimension)
     new_faiss_index.add(vectors)
 
-    # 6. Generate repository summary
+    # 5. Generate repository summary
     print("[CodeLens] Requesting codebase high-level summary from Gemini...")
-    readme_path = None
-    for file in os.listdir(temp_dir):
-        if file.lower() == "readme.md":
-            readme_path = os.path.join(temp_dir, file)
-            break
-            
-    readme_snippet = ""
-    if readme_path and os.path.isfile(readme_path):
-        try:
-            with open(readme_path, 'r', encoding='utf-8', errors='ignore') as f:
-                readme_snippet = f.read(3000)
-        except Exception as readme_err:
-            print(f"[CodeLens] Warning: Could not read README.md - {readme_err}")
-
-    # Build relative paths list
-    relative_paths = [os.path.relpath(f, temp_dir).replace('\\', '/') for f in file_list]
     file_list_str = "\n".join(relative_paths[:150]) # Limiting file list in prompt to prevent token limit
     if len(relative_paths) > 150:
         file_list_str += f"\n... and {len(relative_paths) - 150} other files."
@@ -349,27 +319,27 @@ async def index_repository(request: IndexRequest):
         summary_text = f"This codebase contains {len(relative_paths)} files. Stack components include languages like " + \
                        f"{', '.join(list(set(local_meta[i]['language'] for i in range(len(local_meta))))[:4])}."
 
-    # Build file tree structure
-    tree = build_file_tree(relative_paths)
+    # Clean up temp folder
+    safe_rmtree(temp_dir)
 
     # Commit to global state
     indexed_repo_name = repo_name
     indexed_repo_url = request.repo_url
     indexed_branch = request.branch
     all_file_paths = relative_paths
-    file_tree = tree
+    file_tree = file_tree_data
     faiss_index = new_faiss_index
     chunk_metadata = local_meta
     chunk_contents = local_chunks
     repo_summary = summary_text
     is_indexed = True
 
-    print(f"[CodeLens] Indexing complete! Indexed {len(file_list)} files, {len(local_chunks)} chunks.")
+    print(f"[CodeLens] Indexing complete! Indexed {files_indexed} files, {chunks_created} chunks.")
 
     return {
         "status": "success",
-        "files_indexed": len(file_list),
-        "chunks_created": len(local_chunks),
+        "files_indexed": files_indexed,
+        "chunks_created": chunks_created,
         "repo_summary": repo_summary,
         "file_tree": file_tree
     }

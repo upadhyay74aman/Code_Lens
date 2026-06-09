@@ -5,5 +5,3 @@ google-generativeai
 faiss-cpu
 numpy
 requests
-gitpython
-langchain-text-splitters
