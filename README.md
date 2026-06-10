@@ -130,5 +130,3 @@ Code_Lens/
 MIT License — feel free to use, modify, and distribute.
 
 ---
-
-**Built with ❤️ using Google Gemini, FAISS, and FastAPI**
