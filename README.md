@@ -1,4 +1,4 @@
-# 🔍 CodeLens — AI Codebase Intelligence Engine
+# CodeLens — AI Codebase Intelligence Engine
 
 > **RAG-Powered Semantic Code Search & AI Chat for Any GitHub Repository**
 
@@ -8,21 +8,21 @@ CodeLens lets you **paste any public GitHub repo URL**, indexes the entire codeb
 
 ---
 
-## ✨ Features
+##  Features
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **RAG Pipeline** | Retrieval-Augmented Generation using FAISS vector search + Gemini LLM |
-| 📂 **File Explorer** | Interactive file tree with extension-based icons and search filtering |
-| 💬 **AI Chat** | Ask questions about any codebase in natural language |
-| 🔄 **Conversation Mode** | Multi-turn chat with sliding window context (last 10 messages) |
-| 📊 **Context Sources** | See exactly which code chunks were used, with similarity scores |
-| 📝 **Auto Summary** | Generates a 3-sentence codebase overview on indexing |
-| ⚡ **Model Fallback** | Automatically rotates through Gemini models if quota is hit |
+| **RAG Pipeline** | Retrieval-Augmented Generation using FAISS vector search + Gemini LLM |
+| **File Explorer** | Interactive file tree with extension-based icons and search filtering |
+| **AI Chat** | Ask questions about any codebase in natural language |
+| **Conversation Mode** | Multi-turn chat with sliding window context (last 10 messages) |
+| **Context Sources** | See exactly which code chunks were used, with similarity scores |
+| **Auto Summary** | Generates a 3-sentence codebase overview on indexing |
+| **Model Fallback** | Automatically rotates through Gemini models if quota is hit |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 User Question
@@ -40,7 +40,7 @@ Answer + Source Citations + Similarity Scores
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: Python, FastAPI, Uvicorn
 - **Vector DB**: FAISS (Facebook AI Similarity Search)
@@ -52,7 +52,7 @@ Answer + Source Citations + Similarity Scores
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone the repo
 ```bash
@@ -101,7 +101,7 @@ Navigate to **http://localhost:8000** and start exploring codebases!
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Code_Lens/
@@ -115,7 +115,7 @@ Code_Lens/
 
 ---
 
-## 🔑 How RAG Works in CodeLens
+## How RAG Works in CodeLens
 
 1. **Indexing Phase**: Repository files are split into ~1000 character chunks with 200 char overlap. Each chunk is embedded using Gemini's embedding model and stored in a FAISS Inner Product index.
 
@@ -125,7 +125,7 @@ Code_Lens/
 
 ---
 
-## 📄 License
+## License
 
 MIT License — feel free to use, modify, and distribute.
 
