@@ -29,13 +29,14 @@ User Question
      ↓
 ① EMBED the question (Gemini Embedding API)
      ↓
-② RETRIEVE top-8 most similar code chunks (FAISS cosine similarity)
+② IT retrieve's top-8 most similar code chunks (FAISS cosine similarity)
      ↓
 ③ AUGMENT the LLM prompt with retrieved chunks as context
      ↓
 ④ GENERATE answer using Gemini Flash
      ↓
 Answer + Source Citations + Similarity Scores
+
 ```
 
 ---
@@ -128,5 +129,4 @@ Code_Lens/
 ## License
 
 MIT License — feel free to use, modify, and distribute.
-
 ---
