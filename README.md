@@ -47,8 +47,8 @@ Answer + Source Citations + Similarity Scores
 - **Vector DB**: FAISS (Facebook AI Similarity Search)
 - **Embeddings**: Google Gemini Embedding API (`gemini-embedding-001`)
 - **LLM**: Google Gemini Flash (with automatic model fallback)
-- **Text Splitting**: LangChain `RecursiveCharacterTextSplitter`
-- **Git**: GitPython for repository cloning
+- **Code Parser**: Go CLI for repository cloning, file discovery, file tree generation, and text chunking
+- **Git**: System `git` command used by the parser for repository cloning
 - **Frontend**: Vanilla HTML/CSS/JS with Marked.js + Highlight.js
 
 ---
@@ -108,6 +108,8 @@ Navigate to **http://localhost:8000** and start exploring codebases!
 Code_Lens/
 ├── main.py           # FastAPI backend (RAG pipeline, FAISS, Gemini)
 ├── index.html        # Frontend UI (IDE-style dark theme)
+├── parser/           # Go parser CLI for cloning, file discovery, and chunking
+├── build.ps1         # Windows helper to test and build the parser binary
 ├── requirements.txt  # Python dependencies
 ├── .env              # API key (not committed)
 ├── .gitignore        # Git ignore rules
