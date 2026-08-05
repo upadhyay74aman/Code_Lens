@@ -3,22 +3,21 @@
 # 2. Create .env file with: GEMINI_API_KEY=your_key
 #    Get free key at: https://aistudio.google.com/apikey
 # 3. Run: uvicorn main:app --reload --port 8000
-# 4. Open index.html in browser (use Live Server in VS Code)
+# 4. Open http://localhost:8000 in your browser
 # 5. Paste any public GitHub repo URL and click Index Repository
 
 import os
 import shutil
+import stat
 import tempfile
-import git
 import faiss
 import numpy as np
 import google.generativeai as genai
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from typing import List, Dict, Any, Optional
 
 # Load environment variables
@@ -67,9 +66,6 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-
-
-import stat
 
 def remove_readonly(func, path, excinfo):
     """Error handler for shutil.rmtree to remove read-only files on Windows."""
